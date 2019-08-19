@@ -9,7 +9,7 @@
  * - Remove pointers to scalars, as numba can't currently handle these easily.
  */
 #include <stdbool.h>
-#include "blis.h"
+#include "blis/blis.h"
 
 void pybli_sgemm(bool transa,
                  bool transb,

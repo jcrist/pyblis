@@ -37,7 +37,8 @@ def _load_gemm():
             T,              # beta
             ct.c_void_p,    # c
             ct.c_long,      # rsc
-            ct.c_long       # csc
+            ct.c_long,      # csc
+            ct.c_long       # nthreads
         )
         yield func
 

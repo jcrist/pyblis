@@ -23,7 +23,7 @@ def check_is_2d_contig_array_of_type(name, a, dtype):
 
 
 @nb.generated_jit(nopython=True, nogil=True)
-def gemm(a, b, out=None, trans_a=False, trans_b=False, alpha=1., beta=1.):
+def gemm(a, b, out=None, trans_a=False, trans_b=False, alpha=1., beta=1., nthreads=-1):
     """Multiply two matrices.
 
     Solves ``out = alpha * trans_a(a).dot(beta * trans_b(b))``.
@@ -42,6 +42,9 @@ def gemm(a, b, out=None, trans_a=False, trans_b=False, alpha=1., beta=1.):
         Whether to transpose ``a`` and ``b`` respectively. Default is False.
     alpha, beta : float
         The ``alpha`` and ``beta`` scalars respectively. Default is 1.
+    nthreads : int
+        The number of threads to use. Defaults to deriving from environment
+        variables (e.g. ``BLIS_NUM_THREADS``).
 
     Returns
     -------
@@ -67,7 +70,11 @@ def gemm(a, b, out=None, trans_a=False, trans_b=False, alpha=1., beta=1.):
         if not isinstance(typ, (types.Float, types.Omitted)):
             raise TypingError("%s must be a float" % param)
 
-    def gemm(a, b, out=None, trans_a=False, trans_b=False, alpha=1., beta=1.):
+    if not isinstance(nthreads, (types.Integer, types.Omitted)):
+        raise TypingError("nthreads must be an integer")
+
+    def gemm(a, b, out=None, trans_a=False, trans_b=False,
+             alpha=1., beta=1., nthreads=-1):
         nM = a.shape[0] if not trans_a else a.shape[1]
         nK = a.shape[1] if not trans_a else a.shape[0]
         nN = b.shape[1] if not trans_b else b.shape[0]
@@ -85,7 +92,8 @@ def gemm(a, b, out=None, trans_a=False, trans_b=False, alpha=1., beta=1.):
             a.ctypes, a.shape[1], 1,
             b.ctypes, b.shape[1], 1,
             beta,
-            out.ctypes, out.shape[1], 1
+            out.ctypes, out.shape[1], 1,
+            nthreads
         )
         return out
 

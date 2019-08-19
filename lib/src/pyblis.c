@@ -20,15 +20,24 @@ void pybli_sgemm(bool transa,
                  float*  a, inc_t rsa, inc_t csa,
                  float*  b, inc_t rsb, inc_t csb,
                  float  beta,
-                 float*  c, inc_t rsc, inc_t csc) {
-    bli_sgemm(transa ? BLIS_TRANSPOSE : BLIS_NO_TRANSPOSE,
-              transb ? BLIS_TRANSPOSE : BLIS_NO_TRANSPOSE,
-              m, n, k,
-              &alpha,
-              a, rsa, csa,
-              b, rsb, csb,
-              &beta,
-              c, rsc, csc);
+                 float*  c, inc_t rsc, inc_t csc,
+                 dim_t nthreads) {
+    rntm_t rntm = BLIS_RNTM_INITIALIZER;
+    if (nthreads > 0) {
+        bli_rntm_set_num_threads(nthreads, &rntm);
+    }
+    bli_sgemm_ex(
+        transa ? BLIS_TRANSPOSE : BLIS_NO_TRANSPOSE,
+        transb ? BLIS_TRANSPOSE : BLIS_NO_TRANSPOSE,
+        m, n, k,
+        &alpha,
+        a, rsa, csa,
+        b, rsb, csb,
+        &beta,
+        c, rsc, csc,
+        NULL,
+        &rntm
+    );
 }
 
 void pybli_dgemm(bool transa,
@@ -40,13 +49,22 @@ void pybli_dgemm(bool transa,
                  double*  a, inc_t rsa, inc_t csa,
                  double*  b, inc_t rsb, inc_t csb,
                  double  beta,
-                 double*  c, inc_t rsc, inc_t csc) {
-    bli_dgemm(transa ? BLIS_TRANSPOSE : BLIS_NO_TRANSPOSE,
-              transb ? BLIS_TRANSPOSE : BLIS_NO_TRANSPOSE,
-              m, n, k,
-              &alpha,
-              a, rsa, csa,
-              b, rsb, csb,
-              &beta,
-              c, rsc, csc);
+                 double*  c, inc_t rsc, inc_t csc,
+                 dim_t nthreads) {
+    rntm_t rntm = BLIS_RNTM_INITIALIZER;
+    if (nthreads > 0) {
+        bli_rntm_set_num_threads(nthreads, &rntm);
+    }
+    bli_dgemm_ex(
+        transa ? BLIS_TRANSPOSE : BLIS_NO_TRANSPOSE,
+        transb ? BLIS_TRANSPOSE : BLIS_NO_TRANSPOSE,
+        m, n, k,
+        &alpha,
+        a, rsa, csa,
+        b, rsb, csb,
+        &beta,
+        c, rsc, csc,
+        NULL,
+        &rntm
+    );
 }

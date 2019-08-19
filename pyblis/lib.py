@@ -10,7 +10,7 @@ def load_libblis():
         ext = ".dll"
     else:
         ext = ".so"
-    path = os.path.join(os.path.dirname(__file__), "pyblis" + ext)
+    path = os.path.join(os.path.dirname(__file__), "_lib" + ext)
     return ct.CDLL(path)
 
 

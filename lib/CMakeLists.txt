@@ -4,7 +4,7 @@ project(pyblis)
 
 option(PYBLIS_BUNDLE_BLIS
        "Vendor BLIS library as part of package"
-       ON)
+       OFF)
 
 option(PYBLIS_BUILD_BLIS
        "Link against BLIS built by this project. If not set, will look for a local version."

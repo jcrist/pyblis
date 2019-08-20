@@ -125,6 +125,7 @@ setup(name='pyblis',
       long_description=open('README.rst').read(),
       packages=['pyblis'],
       include_package_data=True,
+      setup_requires=["jinja2"],
       install_requires=["numba"],
       python_requires=">=3.5",
       zip_safe=False)

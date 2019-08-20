@@ -69,8 +69,14 @@ set_target_properties(
     INTERFACE_INCLUDE_DIRECTORIES "${BLIS_INCLUDE_DIR}"
 )
 
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pyblis.c
+    COMMAND python ${CMAKE_SOURCE_DIR}/generate.py ${CMAKE_CURRENT_BINARY_DIR}/pyblis.c
+    DEPENDS pyblis-template.c
+)
+
 set(SOURCE_FILES
-    src/pyblis.c)
+    ${CMAKE_CURRENT_BINARY_DIR}/pyblis.c)
 
 add_library(pyblis SHARED ${SOURCE_FILES})
 target_link_libraries(pyblis blis)

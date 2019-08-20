@@ -142,7 +142,14 @@ cmdclass.update(
 extras_require = {
     "numba": ["numba"],
 }
+
 install_requires = ["numpy"]
+
+entry_points = {
+    "numba_extensions": [
+        "init = pyblis:_init_numba",
+    ],
+}
 
 setup(name='pyblis',
       version=versioneer.get_version(),
@@ -155,4 +162,5 @@ setup(name='pyblis',
       python_requires=">=3.5",
       extras_require=extras_require,
       install_requires=install_requires,
+      entry_points=entry_points,
       zip_safe=False)

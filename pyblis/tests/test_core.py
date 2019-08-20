@@ -8,46 +8,132 @@ import pyblis
 all_dtypes = pytest.mark.parametrize('dtype', ['f4', 'f8', 'c8', 'c16'])
 
 
-@all_dtypes
-def test_gemm(dtype):
-    a = np.random.normal(size=(3, 4)).astype(dtype)
-    b = np.random.normal(size=(4, 5)).astype(dtype)
-    alpha = 4.5
-    beta = 3.5
-    if np.issubdtype(dtype, np.complexfloating):
-        a += np.random.normal(size=a.shape) * 1j
-        b += np.random.normal(size=b.shape) * 1j
-        alpha += 1.3j
-        beta += 2.3j
+class Base(object):
+    def rand(self, dtype, shape=()):
+        a = np.random.normal(size=shape).astype(dtype)
+        if np.issubdtype(dtype, np.complexfloating):
+            a += np.random.normal(size=a.shape) * 1j
+        return a if a.shape else a.reshape((1,))[0]
 
-    # Standard call
-    res = pyblis.gemm(a, b)
-    sol = a.dot(b)
-    assert_allclose(res, sol)
+    def call_base(self, *args, **kwargs):
+        return self.call(*args, **kwargs)
 
-    # With out
-    out = np.zeros(shape=(3, 5), dtype=dtype)
-    res = pyblis.gemm(a, b, out=out)
-    assert res is out
-    assert_allclose(res, sol)
 
-    # With alpha
-    res = pyblis.gemm(a, b, alpha=alpha)
-    assert_allclose(res, alpha * sol)
+class GEMMTests(Base):
+    @all_dtypes
+    def a_b(self, dtype):
+        a = self.rand(dtype, (3, 4))
+        b = self.rand(dtype, (4, 5))
+        return a, b
 
-    # With beta
-    out = np.ones(shape=(3, 5), dtype=dtype)
-    pyblis.gemm(a, b, out=out, beta=beta)
-    assert_allclose(out, beta + sol)
+    @all_dtypes
+    def test_base(self, dtype):
+        a, b = self.a_b(dtype)
+        res = self.call_base(a, b)
+        sol = a.dot(b)
+        assert_allclose(res, sol)
 
-    # With transpose
-    sol = pyblis.gemm(b, a, a_trans=True, b_trans=True)
-    assert_allclose(sol, b.T.dot(a.T))
+    @all_dtypes
+    def test_with_out(self, dtype):
+        a, b = self.a_b(dtype)
+        out = np.zeros(shape=(3, 5), dtype=dtype)
+        res = self.call(a, b, out=out)
+        assert res is out
+        assert_allclose(res, a.dot(b))
 
-    # With conjugate
-    sol = pyblis.gemm(a, b, a_conj=True, b_conj=True)
-    assert_allclose(sol, a.conj().dot(b.conj()))
+    @all_dtypes
+    def test_with_alpha(self, dtype):
+        a, b = self.a_b(dtype)
+        alpha = self.rand(dtype)
+        res = self.call(a, b, alpha=alpha)
+        assert_allclose(res, alpha * a.dot(b))
 
-    # With transpose and conjugate
-    sol = pyblis.gemm(b, a, a_trans=True, a_conj=True, b_trans=True, b_conj=True)
-    assert_allclose(sol, b.conj().T.dot(a.conj().T))
+    @all_dtypes
+    def test_with_beta(self, dtype):
+        a, b = self.a_b(dtype)
+        beta = self.rand(dtype)
+        out = np.ones(shape=(3, 5), dtype=dtype)
+        self.call(a, b, out=out, beta=beta)
+        assert_allclose(out, beta + a.dot(b))
+
+    @all_dtypes
+    def test_with_transpose(self, dtype):
+        a, b = self.a_b(dtype)
+        sol = self.call(b, a, a_trans=True, b_trans=True)
+        assert_allclose(sol, b.T.dot(a.T))
+
+    @all_dtypes
+    def test_with_conjugate(self, dtype):
+        a, b = self.a_b(dtype)
+        sol = self.call(a, b, a_conj=True, b_conj=True)
+        assert_allclose(sol, a.conj().dot(b.conj()))
+
+    @all_dtypes
+    def test_with_transpose_conjugate(self, dtype):
+        a, b = self.a_b(dtype)
+        sol = self.call(b, a, a_trans=True, a_conj=True, b_trans=True, b_conj=True)
+        assert_allclose(sol, b.conj().T.dot(a.conj().T))
+
+    def test_errors_unsupported_dtype(self):
+        a, b = self.a_b('i4')
+        with pytest.raises(self.error_cls) as exc:
+            self.call(a, b)
+        assert "No implementation" in str(exc.value)
+
+    def test_errors_mismatch_dtypes(self):
+        a, b = self.a_b('f4')
+        b = b.astype('f8')
+        with pytest.raises(self.error_cls) as exc:
+            self.call(a, b)
+        assert "Non-uniform" in str(exc.value)
+
+    def test_errors_not_ndarray(self):
+        with pytest.raises(self.error_cls) as exc:
+            self.call(1, 2)
+        assert "NumPy ndarray" in str(exc.value)
+
+    def test_errors_wrong_dimensions(self):
+        with pytest.raises(self.error_cls) as exc:
+            self.call(np.array([1, 2, 3.]), np.array([[1.]]))
+        assert "2 dimensional" in str(exc.value)
+
+    def test_errors_not_contiguous(self):
+        a = self.rand('f4', (3, 4))
+        b = self.rand('f4', (8, 10))[::2, ::2]
+        with pytest.raises(self.error_cls) as exc:
+            self.call(a, b)
+        assert "contiguous" in str(exc.value)
+
+    def test_errors_bad_flags(self):
+        a, b = self.a_b('f4')
+        with pytest.raises(self.error_cls) as exc:
+            self.call(a, b, a_trans=1)
+        assert "bool" in str(exc.value)
+
+    def test_errors_bad_nthreads(self):
+        a, b = self.a_b('f4')
+        with pytest.raises(self.error_cls) as exc:
+            self.call(a, b, nthreads='oops')
+        assert "nthreads" in str(exc.value)
+
+    def test_error_shape_mismatch(self):
+        # Bad b
+        a = self.rand('f4', (3, 4))
+        b = self.rand('f4', (3, 5))
+        with pytest.raises(ValueError) as exc:
+            self.call(a, b)
+        assert "shape mismatch" in str(exc.value)
+
+        # Bad out
+        b = self.rand('f4', (4, 5))
+        out = np.zeros_like(a)
+        with pytest.raises(ValueError) as exc:
+            self.call(a, b, out=out)
+        assert "shape mismatch" in str(exc.value)
+
+
+class TestGEMMCtypes(GEMMTests):
+    error_cls = TypeError
+
+    def call(self, *args, **kwargs):
+        return pyblis.gemm(*args, **kwargs)

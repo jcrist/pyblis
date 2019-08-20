@@ -20,9 +20,12 @@ else:
 ROOT_DIR = os.path.abspath(os.path.dirname(os.path.relpath(__file__)))
 LIB_SRC_DIR = os.path.join(ROOT_DIR, "lib")
 LIB_BUILD_DIR = os.path.join(LIB_SRC_DIR, "build")
+GENERATE_SCRIPT = os.path.join(LIB_SRC_DIR, "generate.py")
 LIB_BUILD_OUTPUT = os.path.join(LIB_BUILD_DIR, "libpyblis.%s" % EXT)
 LIB_TGT_DIR = os.path.join(ROOT_DIR, "pyblis")
 LIB_TGT = os.path.join(LIB_TGT_DIR, "_lib.%s" % EXT)
+PY_SOURCE_TGT = os.path.join(LIB_TGT_DIR, "lib.py")
+PY_SOURCE_TEMPLATE = os.path.join(LIB_TGT_DIR, "lib.py.template")
 
 
 @contextlib.contextmanager
@@ -35,8 +38,23 @@ def changed_dir(dirname):
         os.chdir(oldcwd)
 
 
-class build_lib(Command):
-    description = "build blis wrapper lib"
+def _ensure_jinja2(cmd):
+    try:
+        import jinja2  # noqa
+    except ImportError:
+        cmd.warn('Building pyblis requires jinja2, please install and try again')
+        sys.exit(1)
+
+
+def _ensure_lib(cmd):
+    if not os.path.exists(LIB_TGT):
+        cmd.run_command("build_ext")
+    if not os.path.exists(PY_SOURCE_TGT):
+        cmd.run_command("gen_py_source")
+
+
+class build_ext(Command):
+    description = "build blis wrapper ext"
 
     user_options = [
         ("bundle-blis", None, "bundle BLIS with the library"),
@@ -51,15 +69,11 @@ class build_lib(Command):
         pass
 
     def run(self):
+        _ensure_jinja2(self)
         cmake_options = [
             "-DPYBLIS_BUILD_BLIS=" + ("on" if self.bundle_blis else "off"),
             "-DPYBLIS_BUNDLE_BLIS=" + ("on" if self.bundle_blis else "off")
         ]
-        try:
-            import jinja2  # noqa
-        except ImportError:
-            self.warn('Building pyblis requires jinja2, please install and try again')
-            sys.exit(1)
         os.makedirs(LIB_BUILD_DIR, exist_ok=True)
         with changed_dir(LIB_BUILD_DIR):
             self.spawn(["cmake"] + cmake_options + [LIB_SRC_DIR])
@@ -67,9 +81,19 @@ class build_lib(Command):
             self.copy_file(LIB_BUILD_OUTPUT, LIB_TGT)
 
 
-def _ensure_lib(command):
-    if not getattr(command, "no_lib", False) and not os.path.exists(LIB_TGT):
-        command.run_command("build_lib")
+class gen_py_source(Command):
+    description = "generate python lib wrapper source"
+
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    finalize_options = initialize_options
+
+    def run(self):
+        _ensure_jinja2(self)
+        self.spawn([sys.executable, GENERATE_SCRIPT, PY_SOURCE_TEMPLATE, PY_SOURCE_TGT])
 
 
 class build(_build):
@@ -85,13 +109,6 @@ class install(_install):
 
 
 class develop(_develop):
-    user_options = list(_develop.user_options)
-    user_options.append(("no-go", None, "Don't build the go source"))
-
-    def initialize_options(self):
-        self.no_go = False
-        _develop.initialize_options(self)
-
     def run(self):
         if not self.uninstall:
             _ensure_lib(self)
@@ -101,7 +118,7 @@ class develop(_develop):
 class clean(_clean):
     def run(self):
         if self.all:
-            for f in [LIB_TGT]:
+            for f in [LIB_TGT, PY_SOURCE_TGT]:
                 if os.path.exists(f):
                     os.unlink(f)
         _clean.run(self)
@@ -113,14 +130,18 @@ class clean(_clean):
 cmdclass = versioneer.get_cmdclass()
 cmdclass.update(
     {
-        "build_lib": build_lib,     # directly build the lib source
-        "build": build,             # bdist_wheel or pip install .
-        "install": install,         # python setup.py install
-        "develop": develop,         # python setup.py develop
-        "clean": clean,             # extra cleanup
+        "build_ext": build_ext,             # directly build the ext source
+        "gen_py_source": gen_py_source,     # directly build the python source
+        "build": build,                     # bdist_wheel or pip install .
+        "install": install,                 # python setup.py install
+        "develop": develop,                 # python setup.py develop
+        "clean": clean,                     # extra cleanup
     }
 )
 
+extras_require = {
+    "numba": ["numba"],
+}
 
 setup(name='pyblis',
       version=versioneer.get_version(),
@@ -130,6 +151,6 @@ setup(name='pyblis',
       long_description=open('README.rst').read(),
       packages=['pyblis'],
       include_package_data=True,
-      install_requires=["numba"],
       python_requires=">=3.5",
+      extras_require=extras_require,
       zip_safe=False)

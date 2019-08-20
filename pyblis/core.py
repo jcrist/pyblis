@@ -1,84 +1,123 @@
 import numpy as np
-import numba as nb
-from numba.types import float32, float64, complex64, complex128, boolean, Optional, int32
 
 from . import lib
 
 __all__ = ("gemm",)
 
 
-afloat32 = nb.types.Array(float32, 2, 'C')
-afloat64 = nb.types.Array(float64, 2, 'C')
-acomplex64 = nb.types.Array(complex64, 2, 'C')
-acomplex128 = nb.types.Array(complex128, 2, 'C')
+class TypingContext(object):
+    # Subclasses should define prefixes mapping, and override methods below
+    def error(self, msg):
+        raise NotImplementedError
+
+    def is_bool(self, a):
+        raise NotImplementedError
+
+    def is_int(self, a):
+        raise NotImplementedError
+
+    def is_none(self, a):
+        raise NotImplementedError
+
+    def is_ndarray(self, a):
+        raise NotImplementedError
+
+    def is_contig(self, a):
+        raise NotImplementedError
+
+    def ndim(self, a):
+        return a.ndim
+
+    def dtype(self, a):
+        return a.dtype
+
+    def check_dtype(self, dtype):
+        if dtype not in self.prefixes:
+            self.error("No implementation for arrays of dtype %r" % dtype)
+
+    def check_is_2d_contig_array(self, name, a):
+        if not self.is_ndarray(a):
+            self.error("`%s` must be a NumPy ndarray" % name)
+        elif not self.ndim(a) == 2:
+            self.error("`%s` must be 2 dimensional" % name)
+        elif not self.is_contig(a):
+            self.error("`%s` must be contiguous" % name)
+
+    def check_uniform_dtype(self, **kwargs):
+        params = list(kwargs.items())
+        dtype = self.dtype(params[0][1])
+        self.check_dtype(dtype)
+        for k, v in params:
+            if not self.dtype(v) == dtype:
+                self.error("Non-uniform dtypes found, `%s`'s dtype is %r not %r"
+                           % (k, self.dtype(v), dtype))
+        return dtype
+
+    def check_bools(self, **kwargs):
+        for k, v in kwargs.items():
+            if not self.is_bool(v):
+                self.error("`%s` must be a bool" % k)
+
+    def check_ints(self, **kwargs):
+        for k, v in kwargs.items():
+            if not self.is_int(v):
+                self.error("`%s` must be an int" % k)
+
+    def get_lib_func(self, name, dtype):
+        prefix = self.prefixes[dtype]
+        return getattr(lib, prefix + name)
+
+    def check_gemm(
+        self, a, b, out=None, a_trans=False, a_conj=False, b_trans=False,
+        b_conj=False, alpha=1.0, beta=0.0, nthreads=-1
+    ):
+        arrays = {"a": a, "b": b}
+        if not self.is_none(out):
+            arrays["out"] = out
+        for k, v in arrays.items():
+            self.check_is_2d_contig_array(k, v)
+        dtype = self.check_uniform_dtype(**arrays)
+
+        self.check_bools(a_trans=a_trans, a_conj=a_conj, b_trans=b_trans, b_conj=b_conj)
+        self.check_ints(nthreads=nthreads)
+
+        return dtype, self.get_lib_func("gemm", dtype)
 
 
-@nb.generated_jit(nopython=True, nogil=True)
-def lib_gemm(a, b, out, m, n, k, a_trans, a_conj, b_trans, b_conj, alpha, beta, nthreads):
-    if a.dtype in (nb.float32, nb.float64):
-        lib_gemm = lib.sgemm if a.dtype == nb.float32 else lib.dgemm
+class PythonTyping(TypingContext):
+    prefixes = {np.dtype('f4'): 's',
+                np.dtype('f8'): 'd',
+                np.dtype('c8'): 'c',
+                np.dtype('c16'): 'z'}
 
-        def f(a, b, out, m, n, k, a_trans, a_conj, b_trans, b_conj, alpha, beta, nthreads):
-            lib_gemm(
-                a_trans, a_conj,
-                b_trans, b_conj,
-                m, n, k,
-                alpha,
-                a.ctypes, a.shape[1], 1,
-                b.ctypes, b.shape[1], 1,
-                beta,
-                out.ctypes, out.shape[1], 1,
-                nthreads
-            )
+    def error(self, msg):
+        raise TypeError(msg)
 
-    elif a.dtype in (nb.complex64, nb.complex128):
-        lib_gemm = lib.cgemm if a.dtype == nb.complex64 else lib.zgemm
+    def is_bool(self, a):
+        return isinstance(a, bool)
 
-        def f(a, b, out, m, n, k, a_trans, a_conj, b_trans, b_conj, alpha, beta, nthreads):
-            lib_gemm(
-                a_trans, a_conj,
-                b_trans, b_conj,
-                m, n, k,
-                alpha.real, alpha.imag,
-                a.ctypes, a.shape[1], 1,
-                b.ctypes, b.shape[1], 1,
-                beta.real, beta.imag,
-                out.ctypes, out.shape[1], 1,
-                nthreads
-            )
+    def is_int(self, a):
+        return isinstance(a, int)
 
-    else:
-        raise TypeError
-    return f
+    def is_none(self, a):
+        return a is None
+
+    def is_ndarray(self, a):
+        return isinstance(a, np.ndarray)
+
+    def is_contig(self, a):
+        return a.flags.contiguous
+
+    def cast_scalar(self, name, val, dtype):
+        try:
+            return dtype.type(val)
+        except TypeError as exc:
+            self.error("%s %s" % (name, exc))
 
 
-def _gemm_signatures():
-    typs = [(afloat32, float32), (afloat64, float64),
-            (acomplex64, complex64), (acomplex128, complex128)]
-    return [aT(aT, aT, Optional(aT), boolean, boolean, boolean, boolean, T, T, int32)
-            for (aT, T) in typs]
+_CTX = PythonTyping()
 
 
-@nb.jit(_gemm_signatures(), nopython=True, nogil=True)
-def _gemm(a, b, out, a_trans, a_conj, b_trans, b_conj, alpha, beta, nthreads):
-    m = a.shape[0] if not a_trans else a.shape[1]
-    n = b.shape[1] if not b_trans else b.shape[0]
-    k = a.shape[1] if not a_trans else a.shape[0]
-
-    if out is None:
-        out = np.zeros((m, n), dtype=a.dtype)
-    elif out.shape[0] != m or out.shape[1] != n:
-        raise ValueError("Output shape mismatch")
-
-    lib_gemm(a, b, out, m, n, k,
-             a_trans, a_conj,
-             b_trans, b_conj,
-             alpha, beta,
-             nthreads)
-    return out
-
-
-@nb.jit(nopython=True, nogil=True)
 def gemm(a, b, out=None, a_trans=False, a_conj=False,
          b_trans=False, b_conj=False, alpha=1.0, beta=0.0, nthreads=-1):
     """Multiply two matrices.
@@ -112,4 +151,8 @@ def gemm(a, b, out=None, a_trans=False, a_conj=False,
     -------
     out : np.ndarray[T]
     """
-    return _gemm(a, b, out, a_trans, a_conj, b_trans, b_conj, alpha, beta, nthreads)
+    dtype, gemm = _CTX.check_gemm(a, b, out, a_trans, a_conj, b_trans, b_conj,
+                                  alpha, beta, nthreads)
+    alpha = _CTX.cast_scalar("alpha", alpha, dtype)
+    beta = _CTX.cast_scalar("beta", beta, dtype)
+    return gemm(a, b, out, a_trans, a_conj, b_trans, b_conj, alpha, beta, nthreads)

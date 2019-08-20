@@ -1,0 +1,74 @@
+import ctypes as ct
+import os
+import sys
+
+import numpy as np
+
+
+def load_libblis():
+    if sys.platform == "darwin":
+        ext = ".dylib"
+    elif sys.platform == "win32":
+        ext = ".dll"
+    else:
+        ext = ".so"
+    path = os.path.join(os.path.dirname(__file__), "_lib" + ext)
+    return ct.CDLL(path)
+
+
+libblis = load_libblis()
+
+# GEMM
+{% for T in all_types %}
+pybli_{{ T.char }}gemm = libblis.pybli_{{ T.char }}gemm
+pybli_{{ T.char }}gemm.argtypes = (
+    ct.c_bool,          # a_trans
+    ct.c_bool,          # a_conj
+    ct.c_bool,          # b_trans
+    ct.c_bool,          # b_conj
+    ct.c_long,          # m
+    ct.c_long,          # n
+    ct.c_long,          # k
+    {{ T.alpha_py_sig }}, # alpha
+    ct.c_void_p,        # a
+    ct.c_long,          # rsa
+    ct.c_long,          # csa
+    ct.c_void_p,        # b
+    ct.c_long,          # rsb
+    ct.c_long,          # csb
+    {{ T.beta_py_sig }},  # beta
+    ct.c_void_p,        # c
+    ct.c_long,          # rsc
+    ct.c_long,          # csc
+    ct.c_long           # nthreads
+)
+
+def {{ T.char }}gemm(
+    a, b, out=None, a_trans=False, a_conj=False,
+    b_trans=False, b_conj=False, alpha=1.0, beta=0.0,
+    nthreads=-1
+):
+    m = a.shape[0] if not a_trans else a.shape[1]
+    k = a.shape[1] if not a_trans else a.shape[0]
+    n = b.shape[1] if not b_trans else b.shape[0]
+    k2 = b.shape[0] if not b_trans else b.shape[1]
+
+    if k != k2:
+        raise ValueError("b shape mismatch")
+
+    if out is None:
+        out = np.zeros((m, n), dtype=a.dtype)
+    elif out.shape[0] != m or out.shape[1] != n:
+        raise ValueError("Output shape mismatch")
+
+    pybli_{{ T.char }}gemm(a_trans, a_conj,
+              b_trans, b_conj,
+              m, n, k,
+              {{ T.alpha_py_call }},
+              a.ctypes, a.shape[1], 1,
+              b.ctypes, b.shape[1], 1,
+              {{ T.alpha_py_call }},
+              out.ctypes, out.shape[1], 1,
+              nthreads)
+    return out
+{% endfor %}

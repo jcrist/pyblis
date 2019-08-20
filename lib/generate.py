@@ -1,5 +1,4 @@
 import sys
-import os
 import jinja2
 
 
@@ -14,14 +13,25 @@ class Type(object):
             beta_sig = "{0} beta_real, {0} beta_imag".format(self.rtype)
             alpha_init = "%s alpha = {alpha_real, alpha_imag}" % (self.ctype)
             beta_init = "%s beta = {beta_real, beta_imag}" % (self.ctype)
+            alpha_py_sig = "ct.c_%s, ct.c_%s" % (self.rtype, self.rtype)
+            alpha_py_call = "alpha.real, alpha.imag"
+            beta_py_sig = "ct.c_%s, ct.c_%s" % (self.rtype, self.rtype)
+            beta_py_call = "beta.real, beta.imag"
         else:
             alpha_sig = "{0} alpha".format(self.ctype)
             beta_sig = "{0} beta".format(self.ctype)
             alpha_init = beta_init = ""
+            alpha_py_sig = beta_py_sig = "ct.c_%s" % self.ctype
+            alpha_py_call = "alpha"
+            beta_py_call = "beta"
         self.alpha_sig = alpha_sig
         self.beta_sig = beta_sig
         self.alpha_init = alpha_init
         self.beta_init = beta_init
+        self.alpha_py_sig = alpha_py_sig
+        self.alpha_py_call = alpha_py_call
+        self.beta_py_sig = beta_py_sig
+        self.beta_py_call = beta_py_call
 
 
 float32 = Type("s", "float", False)
@@ -33,12 +43,9 @@ all_types = [float32, float64, complex64, complex128]
 
 parameters = dict(all_types=all_types)
 
-THIS_DIR = os.path.dirname(__file__)
-TEMPLATE = os.path.join(THIS_DIR, "pyblis-template.c")
 
-
-def generate_source(target=None):
-    with open(TEMPLATE) as f:
+def generate_source(template, target):
+    with open(template) as f:
         data = f.read()
     template = jinja2.Template(data)
     output = template.render(**parameters)
@@ -47,4 +54,4 @@ def generate_source(target=None):
 
 
 if __name__ == "__main__":
-    generate_source(sys.argv[1])
+    generate_source(sys.argv[1], sys.argv[2])

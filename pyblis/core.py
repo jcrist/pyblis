@@ -1,47 +1,109 @@
 import numpy as np
 import numba as nb
-from numba import types
-from numba.errors import TypingError
+from numba.types import float32, float64, complex64, complex128, boolean, Optional, int32
 
 from . import lib
 
 __all__ = ("gemm",)
 
 
-def check_is_2d_contig_array_of_type(name, a, dtype):
-    if not isinstance(a, types.Array):
-        raise TypingError("`%s` must be a NumPy ndarray" % name)
-    elif not isinstance(a.dtype, types.Float):
-        raise TypingError("`%s` must a floating-point dtype" % name)
-    elif not a.dtype == dtype:
-        raise TypingError("Non-uniform dtypes found, `%s`'s dtype is %r not %r"
-                          % (name, a.dtype, dtype))
-    elif not a.ndim == 2:
-        raise TypingError("`%s` must be a 2 dimensional array" % name)
-    elif not a.is_contig:
-        raise TypingError("`%s` must be contiguous" % name)
+afloat32 = nb.types.Array(float32, 2, 'C')
+afloat64 = nb.types.Array(float64, 2, 'C')
+acomplex64 = nb.types.Array(complex64, 2, 'C')
+acomplex128 = nb.types.Array(complex128, 2, 'C')
 
 
 @nb.generated_jit(nopython=True, nogil=True)
-def gemm(a, b, out=None, trans_a=False, trans_b=False, alpha=1., beta=1., nthreads=-1):
+def lib_gemm(a, b, out, m, n, k, a_trans, a_conj, b_trans, b_conj, alpha, beta, nthreads):
+    if a.dtype in (nb.float32, nb.float64):
+        lib_gemm = lib.sgemm if a.dtype == nb.float32 else lib.dgemm
+
+        def f(a, b, out, m, n, k, a_trans, a_conj, b_trans, b_conj, alpha, beta, nthreads):
+            lib_gemm(
+                a_trans, a_conj,
+                b_trans, b_conj,
+                m, n, k,
+                alpha,
+                a.ctypes, a.shape[1], 1,
+                b.ctypes, b.shape[1], 1,
+                beta,
+                out.ctypes, out.shape[1], 1,
+                nthreads
+            )
+
+    elif a.dtype in (nb.complex64, nb.complex128):
+        lib_gemm = lib.cgemm if a.dtype == nb.complex64 else lib.zgemm
+
+        def f(a, b, out, m, n, k, a_trans, a_conj, b_trans, b_conj, alpha, beta, nthreads):
+            lib_gemm(
+                a_trans, a_conj,
+                b_trans, b_conj,
+                m, n, k,
+                alpha.real, alpha.imag,
+                a.ctypes, a.shape[1], 1,
+                b.ctypes, b.shape[1], 1,
+                beta.real, beta.imag,
+                out.ctypes, out.shape[1], 1,
+                nthreads
+            )
+
+    else:
+        raise TypeError
+    return f
+
+
+def _gemm_signatures():
+    typs = [(afloat32, float32), (afloat64, float64),
+            (acomplex64, complex64), (acomplex128, complex128)]
+    return [aT(aT, aT, Optional(aT), boolean, boolean, boolean, boolean, T, T, int32)
+            for (aT, T) in typs]
+
+
+@nb.jit(_gemm_signatures(), nopython=True, nogil=True)
+def _gemm(a, b, out, a_trans, a_conj, b_trans, b_conj, alpha, beta, nthreads):
+    m = a.shape[0] if not a_trans else a.shape[1]
+    n = b.shape[1] if not b_trans else b.shape[0]
+    k = a.shape[1] if not a_trans else a.shape[0]
+
+    if out is None:
+        out = np.zeros((m, n), dtype=a.dtype)
+    elif out.shape[0] != m or out.shape[1] != n:
+        raise ValueError("Output shape mismatch")
+
+    lib_gemm(a, b, out, m, n, k,
+             a_trans, a_conj,
+             b_trans, b_conj,
+             alpha, beta,
+             nthreads)
+    return out
+
+
+@nb.jit(nopython=True, nogil=True)
+def gemm(a, b, out=None, a_trans=False, a_conj=False,
+         b_trans=False, b_conj=False, alpha=1.0, beta=0.0, nthreads=-1):
     """Multiply two matrices.
 
-    Solves ``out = alpha * trans_a(a).dot(beta * trans_b(b))``.
+    Solves ``out = alpha * op_a(a).dot(beta * op_b(b))``.
 
-    Where ``trans_a`` and ``trans_b`` indicate whether to take the transpose of
-    ``a`` or ``b`` respectively.
+    Where ``op_a`` and ``op_b`` indicate any transpose/conjugate operation
+    specified on ``a`` or ``b`` respectively.
 
     Parameters
     ----------
     a, b : np.ndarray[T]
-        Two identically typed arrays, where ``T`` is one of (float64, float32).
+        Two identically typed arrays, where ``T`` is one of
+        (float64, float32, complex128, complex64).
     out : np.ndarray[T], optional
         An optional output array, must match the type of the input arrays. If
         not provided, a new array will be allocated.
-    trans_a, trans_b : bool, optional
+    a_trans, b_trans : bool, optional
         Whether to transpose ``a`` and ``b`` respectively. Default is False.
-    alpha, beta : float
-        The ``alpha`` and ``beta`` scalars respectively. Default is 1.
+    a_conj, b_conj : bool, optional
+        Whether to conjugate ``a`` and ``b`` respectively. Default is False.
+    alpha : T
+        The ``alpha`` factor. Default is 1.
+    beta : T
+        The ``beta`` factor. Default is 0.
     nthreads : int
         The number of threads to use. Defaults to deriving from environment
         variables (e.g. ``BLIS_NUM_THREADS``).
@@ -50,51 +112,4 @@ def gemm(a, b, out=None, trans_a=False, trans_b=False, alpha=1., beta=1., nthrea
     -------
     out : np.ndarray[T]
     """
-    arrays = [("a", a), ("b", b)]
-    if not isinstance(out, (types.NoneType, types.Omitted)):
-        arrays.append(("out", out))
-
-    for param, x in arrays:
-        check_is_2d_contig_array_of_type(param, x, a.dtype)
-
-    if a.dtype == types.float32:
-        lib_gemm = lib.sgemm
-    else:
-        lib_gemm = lib.dgemm
-
-    for param, typ in [("trans_a", trans_a), ("trans_b", trans_b)]:
-        if not isinstance(typ, (types.Boolean, types.Omitted)):
-            raise TypingError("%s must be a boolean" % param)
-
-    for param, typ in [("alpha", alpha), ("beta", beta)]:
-        if not isinstance(typ, (types.Float, types.Omitted)):
-            raise TypingError("%s must be a float" % param)
-
-    if not isinstance(nthreads, (types.Integer, types.Omitted)):
-        raise TypingError("nthreads must be an integer")
-
-    def gemm(a, b, out=None, trans_a=False, trans_b=False,
-             alpha=1., beta=1., nthreads=-1):
-        nM = a.shape[0] if not trans_a else a.shape[1]
-        nK = a.shape[1] if not trans_a else a.shape[0]
-        nN = b.shape[1] if not trans_b else b.shape[0]
-
-        if out is None:
-            out = np.zeros((nM, nN), dtype=a.dtype)
-        elif out.shape[0] != nM or out.shape[1] != nN:
-            raise ValueError("Output shape mismatch")
-
-        lib_gemm(
-            trans_a,
-            trans_b,
-            nM, nN, nK,
-            alpha,
-            a.ctypes, a.shape[1], 1,
-            b.ctypes, b.shape[1], 1,
-            beta,
-            out.ctypes, out.shape[1], 1,
-            nthreads
-        )
-        return out
-
-    return gemm
+    return _gemm(a, b, out, a_trans, a_conj, b_trans, b_conj, alpha, beta, nthreads)

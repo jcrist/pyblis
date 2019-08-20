@@ -55,6 +55,11 @@ class build_lib(Command):
             "-DPYBLIS_BUILD_BLIS=" + ("on" if self.bundle_blis else "off"),
             "-DPYBLIS_BUNDLE_BLIS=" + ("on" if self.bundle_blis else "off")
         ]
+        try:
+            import jinja2  # noqa
+        except ImportError:
+            self.warn('Building pyblis requires jinja2, please install and try again')
+            sys.exit(1)
         os.makedirs(LIB_BUILD_DIR, exist_ok=True)
         with changed_dir(LIB_BUILD_DIR):
             self.spawn(["cmake"] + cmake_options + [LIB_SRC_DIR])
@@ -125,7 +130,6 @@ setup(name='pyblis',
       long_description=open('README.rst').read(),
       packages=['pyblis'],
       include_package_data=True,
-      setup_requires=["jinja2"],
       install_requires=["numba"],
       python_requires=">=3.5",
       zip_safe=False)

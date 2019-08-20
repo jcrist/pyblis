@@ -67,7 +67,7 @@ def {{ T.char }}gemm(
               {{ T.alpha_py_call }},
               a.ctypes, a.shape[1], 1,
               b.ctypes, b.shape[1], 1,
-              {{ T.alpha_py_call }},
+              {{ T.beta_py_call }},
               out.ctypes, out.shape[1], 1,
               nthreads)
     return out

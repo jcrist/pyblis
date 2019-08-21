@@ -22,9 +22,6 @@ class TypingContext(object):
     def is_ndarray(self, a):
         raise NotImplementedError
 
-    def is_contig(self, a):
-        raise NotImplementedError
-
     def ndim(self, a):
         return a.ndim
 
@@ -35,13 +32,11 @@ class TypingContext(object):
         if dtype not in self.prefixes:
             self.error("No implementation for arrays of dtype %r" % dtype)
 
-    def check_is_2d_contig_array(self, name, a):
+    def check_is_2d_array(self, name, a):
         if not self.is_ndarray(a):
             self.error("`%s` must be a NumPy ndarray" % name)
         elif not self.ndim(a) == 2:
             self.error("`%s` must be 2 dimensional" % name)
-        elif not self.is_contig(a):
-            self.error("`%s` must be contiguous" % name)
 
     def check_uniform_dtype(self, **kwargs):
         params = list(kwargs.items())
@@ -75,7 +70,7 @@ class TypingContext(object):
         if not self.is_none(out):
             arrays["out"] = out
         for k, v in arrays.items():
-            self.check_is_2d_contig_array(k, v)
+            self.check_is_2d_array(k, v)
         dtype = self.check_uniform_dtype(**arrays)
 
         self.check_bools(a_trans=a_trans, a_conj=a_conj, b_trans=b_trans, b_conj=b_conj)
@@ -104,9 +99,6 @@ class PythonTyping(TypingContext):
 
     def is_ndarray(self, a):
         return isinstance(a, np.ndarray)
-
-    def is_contig(self, a):
-        return a.flags.contiguous
 
     def cast_scalar(self, name, val, dtype):
         try:

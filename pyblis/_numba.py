@@ -26,9 +26,6 @@ class NumbaTyping(TypingContext):
     def is_ndarray(self, a):
         return isinstance(a, nb.types.Array)
 
-    def is_contig(self, a):
-        return a.is_contig
-
 
 _CTX = NumbaTyping()
 

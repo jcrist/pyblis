@@ -65,10 +65,16 @@ def {{ T.char }}gemm(
               b_trans, b_conj,
               m, n, k,
               {{ T.alpha_py_call }},
-              a.ctypes, a.shape[1], 1,
-              b.ctypes, b.shape[1], 1,
+              a.ctypes,
+              a.strides[0] // a.itemsize,
+              a.strides[1] // a.itemsize,
+              b.ctypes,
+              b.strides[0] // b.itemsize,
+              b.strides[1] // b.itemsize,
               {{ T.beta_py_call }},
-              out.ctypes, out.shape[1], 1,
+              out.ctypes,
+              out.strides[0] // out.itemsize,
+              out.strides[1] // out.itemsize,
               nthreads)
     return out
 {% endfor %}

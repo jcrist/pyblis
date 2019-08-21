@@ -74,6 +74,16 @@ class GEMMTests(Base):
         sol = self.call(b, a, a_trans=True, a_conj=True, b_trans=True, b_conj=True)
         assert_allclose(sol, b.conj().T.dot(a.conj().T))
 
+    @all_dtypes
+    def test_with_strides(self, dtype):
+        a, b = self.a_b(dtype)
+
+        res = self.call(a, a.T)
+        assert_allclose(res, a.dot(a.T))
+
+        res = self.call(a[::2], b[:, ::2])
+        assert_allclose(res, a[::2].dot(b[:, ::2]))
+
     def test_errors_unsupported_dtype(self):
         a, b = self.a_b('i4')
         with pytest.raises(self.error_cls) as exc:
@@ -96,13 +106,6 @@ class GEMMTests(Base):
         with pytest.raises(self.error_cls) as exc:
             self.call(np.array([1, 2, 3.]), np.array([[1.]]))
         assert "2 dimensional" in str(exc.value)
-
-    def test_errors_not_contiguous(self):
-        a = self.rand('f4', (3, 4))
-        b = self.rand('f4', (8, 10))[::2, ::2]
-        with pytest.raises(self.error_cls) as exc:
-            self.call(a, b)
-        assert "contiguous" in str(exc.value)
 
     def test_errors_bad_flags(self):
         a, b = self.a_b('f4')

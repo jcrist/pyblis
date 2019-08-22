@@ -2,7 +2,7 @@ import numba as nb
 from numba.extending import overload
 from numba.errors import TypingError
 
-from . import lib
+from . import lib, _wrappers
 from ._core import TypingContext
 
 
@@ -65,3 +65,9 @@ def overload_syrk(a, out=None, a_trans=False, a_conj=False, out_upper=False,
 @overload(lib.mksymm)
 def overload_mksymm(a, upper=False, nthreads=-1):
     return _CTX.check_mksymm(a, upper, nthreads)
+
+
+@overload(_wrappers.dot)
+def overload_dot(a, b, out=None, nthreads=-1):
+    _CTX.check_gemm(a, b, out=out, nthreads=nthreads)
+    return _wrappers.dot

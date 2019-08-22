@@ -57,9 +57,11 @@ def {{ T.char }}gemm(
         raise ValueError("b shape mismatch")
 
     if out is None:
-        out = np.zeros((m, n), dtype=a.dtype)
+        c = np.zeros((m, n), dtype=a.dtype)
     elif out.shape[0] != m or out.shape[1] != n:
         raise ValueError("Output shape mismatch")
+    else:
+        c = out
 
     pybli_{{ T.char }}gemm(a_trans, a_conj,
               b_trans, b_conj,
@@ -72,11 +74,11 @@ def {{ T.char }}gemm(
               b.strides[0] // b.itemsize,
               b.strides[1] // b.itemsize,
               {{ T.beta_py_call }},
-              out.ctypes,
-              out.strides[0] // out.itemsize,
-              out.strides[1] // out.itemsize,
+              c.ctypes,
+              c.strides[0] // c.itemsize,
+              c.strides[1] // c.itemsize,
               nthreads)
-    return out
+    return c
 {% endfor %}
 
 # SYRM
@@ -108,9 +110,11 @@ def {{ T.char }}syrk(
     k = a.shape[0] if a_trans else a.shape[1]
 
     if out is None:
-        out = np.zeros((m, m), dtype=a.dtype)
+        c = np.zeros((m, m), dtype=a.dtype)
     elif out.shape[0] != m or out.shape[1] != m:
         raise ValueError("Output shape mismatch")
+    else:
+        c = out
 
     pybli_{{ T.char }}syrk(
         a_trans,
@@ -123,12 +127,12 @@ def {{ T.char }}syrk(
         a.strides[0] // a.itemsize,
         a.strides[1] // a.itemsize,
         {{ T.beta_py_call }},
-        out.ctypes,
-        out.strides[0] // out.itemsize,
-        out.strides[1] // out.itemsize,
+        c.ctypes,
+        c.strides[0] // c.itemsize,
+        c.strides[1] // c.itemsize,
         nthreads
     )
-    return out
+    return c
 {% endfor %}
 
 # MKSYMM

@@ -6,13 +6,12 @@ import pyblis
 import pyblis._numba
 
 from .test_core import GEMMTests, SYRKTests, MKSYMMTests
+from .utils import NumbaMixin
 
 
-class TestGEMMNumba(GEMMTests):
-    error_cls = nb.errors.TypingError
-
+class TestGEMMNumba(NumbaMixin, GEMMTests):
     @classmethod
-    def setup_class(cls):
+    def compile(cls):
         @nb.jit(nopython=True)
         def base(a, b):
             return pyblis.lib.gemm(a, b)
@@ -23,22 +22,12 @@ class TestGEMMNumba(GEMMTests):
             return pyblis.lib.gemm(a, b, out=out, a_trans=a_trans, a_conj=a_conj,
                                    b_trans=b_trans, b_conj=b_conj, alpha=alpha,
                                    beta=beta, nthreads=nthreads)
-
-        cls.base = staticmethod(base)
-        cls.full = staticmethod(full)
-
-    def call(self, *args, **kwargs):
-        return self.full(*args, **kwargs)
-
-    def call_base(self, *args, **kwargs):
-        return self.base(*args, **kwargs)
+        return base, full
 
 
-class TestSYRKNumba(SYRKTests):
-    error_cls = nb.errors.TypingError
-
+class TestSYRKNumba(NumbaMixin, SYRKTests):
     @classmethod
-    def setup_class(cls):
+    def compile(cls):
         @nb.jit(nopython=True)
         def base(a):
             return pyblis.lib.syrk(a)
@@ -49,27 +38,14 @@ class TestSYRKNumba(SYRKTests):
             return pyblis.lib.syrk(a, out=out, a_trans=a_trans, a_conj=a_conj,
                                    out_upper=out_upper, alpha=alpha, beta=beta,
                                    nthreads=nthreads)
-
-        cls.base = staticmethod(base)
-        cls.full = staticmethod(full)
-
-    def call(self, *args, **kwargs):
-        return self.full(*args, **kwargs)
-
-    def call_base(self, *args, **kwargs):
-        return self.base(*args, **kwargs)
+        return base, full
 
 
-class TestMKSYMMNumba(MKSYMMTests):
-    error_cls = nb.errors.TypingError
-
+class TestMKSYMMNumba(NumbaMixin, MKSYMMTests):
     @classmethod
-    def setup_class(cls):
+    def compile(cls):
         @nb.jit(nopython=True)
         def full(a, upper=False, nthreads=-1):
             return pyblis.lib.mksymm(a, upper=upper, nthreads=nthreads)
 
-        cls.full = staticmethod(full)
-
-    def call(self, *args, **kwargs):
-        return self.full(*args, **kwargs)
+        return full, full

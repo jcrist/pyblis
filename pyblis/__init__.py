@@ -1,4 +1,5 @@
 from . import lib
+from ._wrappers import dot
 
 def _init_numba():
     """Initialize the numba extension"""

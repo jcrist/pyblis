@@ -5,18 +5,7 @@ from numpy.testing import assert_allclose
 
 import pyblis
 
-all_dtypes = pytest.mark.parametrize('dtype', ['f4', 'f8', 'c8', 'c16'])
-
-
-class Base(object):
-    def rand(self, dtype, shape=()):
-        a = np.random.normal(size=shape).astype(dtype)
-        if np.issubdtype(dtype, np.complexfloating):
-            a += np.random.normal(size=a.shape) * 1j
-        return a if a.shape else a.reshape((1,))[0]
-
-    def call_base(self, *args, **kwargs):
-        return self.call(*args, **kwargs)
+from .utils import Base, all_dtypes
 
 
 class GEMMTests(Base):

@@ -1,4 +1,4 @@
-from .core import gemm
+from .core import gemm, syrk, mksymm
 
 def _init_numba():
     """Initialize the numba extension"""

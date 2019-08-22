@@ -78,3 +78,84 @@ def {{ T.char }}gemm(
               nthreads)
     return out
 {% endfor %}
+
+# SYRM
+{% for T in all_types %}
+pybli_{{ T.char }}syrk = libblis.pybli_{{ T.char }}syrk
+pybli_{{ T.char }}syrk.argtypes = (
+    ct.c_bool,          # a_trans
+    ct.c_bool,          # a_conj
+    ct.c_bool,          # c_upper
+    ct.c_long,          # m
+    ct.c_long,          # k
+    {{ T.alpha_py_sig }}, # alpha
+    ct.c_void_p,        # a
+    ct.c_long,          # rsa
+    ct.c_long,          # csa
+    {{ T.beta_py_sig }},  # beta
+    ct.c_void_p,        # c
+    ct.c_long,          # rsc
+    ct.c_long,          # csc
+    ct.c_long           # nthreads
+)
+
+def {{ T.char }}syrk(
+    a, out=None, a_trans=False, a_conj=False,
+    out_upper=False, alpha=1.0, beta=0.0,
+    nthreads=-1
+):
+    m = a.shape[0] if a_trans else a.shape[1]
+    k = a.shape[1] if a_trans else a.shape[0]
+
+    if out is None:
+        out = np.zeros((m, m), dtype=a.dtype)
+    elif out.shape[0] != m or out.shape[0] != m:
+        raise ValueError("Output shape mismatch")
+
+    pybli_{{ T.char }}syrk(
+        a_trans,
+        a_conj,
+        out_upper,
+        m,
+        k,
+        {{ T.alpha_py_call }},
+        a.ctypes,
+        a.strides[0] // a.itemsize,
+        a.strides[1] // a.itemsize,
+        {{ T.beta_py_call }},
+        out.ctypes,
+        out.strides[0] // out.itemsize,
+        out.strides[1] // out.itemsize,
+        nthreads
+    )
+    return out
+{% endfor %}
+
+# MKSYMM
+{% for T in all_types %}
+pybli_{{ T.char }}mksymm = libblis.pybli_{{ T.char }}mksymm
+pybli_{{ T.char }}mksymm.argtypes = (
+    ct.c_bool,          # a_upper
+    ct.c_long,          # m
+    ct.c_void_p,        # a
+    ct.c_long,          # rsa
+    ct.c_long,          # csa
+    ct.c_long           # nthreads
+)
+
+def {{ T.char }}mksymm(a, upper=False, nthreads=-1):
+    if a.shape[0] != a.shape[1]:
+        raise ValueError("`a` must be a square matrix")
+
+    m = a.shape[0]
+
+    pybli_{{ T.char }}mksymm(
+        upper,
+        m,
+        a.ctypes,
+        a.strides[0] // a.itemsize,
+        a.strides[1] // a.itemsize,
+        nthreads
+    )
+    return a
+{% endfor %}

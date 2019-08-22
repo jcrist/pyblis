@@ -71,7 +71,7 @@ set_target_properties(
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pyblis.c
-    COMMAND python ${CMAKE_SOURCE_DIR}/generate.py ${CMAKE_CURRENT_BINARY_DIR}/pyblis.c
+    COMMAND python ${CMAKE_SOURCE_DIR}/generate.py ${CMAKE_SOURCE_DIR}/pyblis-template.c ${CMAKE_CURRENT_BINARY_DIR}/pyblis.c
     DEPENDS pyblis-template.c
 )
 

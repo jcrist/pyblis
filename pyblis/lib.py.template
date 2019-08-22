@@ -104,12 +104,12 @@ def {{ T.char }}syrk(
     out_upper=False, alpha=1.0, beta=0.0,
     nthreads=-1
 ):
-    m = a.shape[0] if a_trans else a.shape[1]
-    k = a.shape[1] if a_trans else a.shape[0]
+    m = a.shape[1] if a_trans else a.shape[0]
+    k = a.shape[0] if a_trans else a.shape[1]
 
     if out is None:
         out = np.zeros((m, m), dtype=a.dtype)
-    elif out.shape[0] != m or out.shape[0] != m:
+    elif out.shape[0] != m or out.shape[1] != m:
         raise ValueError("Output shape mismatch")
 
     pybli_{{ T.char }}syrk(

@@ -30,10 +30,11 @@ class NumbaTyping(TypingContext):
         if val == dtype:
             return
         elif (isinstance(dtype, nb.types.Float) and
-              isinstance(val, (nb.types.Float, nb.types.Integer))):
+              isinstance(val, (float, int, nb.types.Float, nb.types.Integer))):
             return
         elif (isinstance(dtype, nb.types.Complex) and
-              isinstance(val, (nb.types.Float, nb.types.Integer, nb.types.Complex))):
+              isinstance(val, (float, int, complex, nb.types.Float,
+                               nb.types.Integer, nb.types.Complex))):
             return
         else:
             self.error("`%s` should have dtype %r, got %r" % (name, dtype, val))

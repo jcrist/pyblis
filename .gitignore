@@ -8,7 +8,7 @@ dist/
 .eggs/
 .DS_Store
 htmlcov/
-pyblis/lib.py
+pyblis/_lib.py
 *.so
 *.dylib
 *.ipynb_checkpoints

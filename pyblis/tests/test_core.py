@@ -138,7 +138,7 @@ class TestGEMMCtypes(GEMMTests):
     error_cls = TypeError
 
     def call(self, *args, **kwargs):
-        return pyblis.gemm(*args, **kwargs)
+        return pyblis.lib.gemm(*args, **kwargs)
 
 
 class SYRKTests(Base):
@@ -274,7 +274,7 @@ class TestSYRKCtypes(SYRKTests):
     error_cls = TypeError
 
     def call(self, *args, **kwargs):
-        return pyblis.syrk(*args, **kwargs)
+        return pyblis.lib.syrk(*args, **kwargs)
 
 
 class MKSYMMTests(Base):
@@ -333,4 +333,4 @@ class TestMKSYMMCtypes(MKSYMMTests):
     error_cls = TypeError
 
     def call(self, *args, **kwargs):
-        return pyblis.mksymm(*args, **kwargs)
+        return pyblis.lib.mksymm(*args, **kwargs)

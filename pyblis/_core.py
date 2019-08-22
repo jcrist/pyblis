@@ -1,6 +1,6 @@
 import numpy as np
 
-from . import lib
+from . import _lib
 
 __all__ = ("gemm",)
 
@@ -64,7 +64,7 @@ class TypingContext(object):
 
     def get_lib_func(self, name, dtype):
         prefix = self.prefixes[dtype]
-        return getattr(lib, prefix + name)
+        return getattr(_lib, prefix + name)
 
     def check_gemm(
         self, a, b, out=None, a_trans=False, a_conj=False, b_trans=False,

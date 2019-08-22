@@ -24,8 +24,8 @@ GENERATE_SCRIPT = os.path.join(LIB_SRC_DIR, "generate.py")
 LIB_BUILD_OUTPUT = os.path.join(LIB_BUILD_DIR, "libpyblis.%s" % EXT)
 LIB_TGT_DIR = os.path.join(ROOT_DIR, "pyblis")
 LIB_TGT = os.path.join(LIB_TGT_DIR, "_lib.%s" % EXT)
-PY_SOURCE_TGT = os.path.join(LIB_TGT_DIR, "lib.py")
-PY_SOURCE_TEMPLATE = os.path.join(LIB_TGT_DIR, "lib.py.template")
+PY_SOURCE_TGT = os.path.join(LIB_TGT_DIR, "_lib.py")
+PY_SOURCE_TEMPLATE = os.path.join(LIB_TGT_DIR, "_lib.py.template")
 
 
 @contextlib.contextmanager

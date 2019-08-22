@@ -2,7 +2,8 @@ import numba as nb
 from numba.extending import overload
 from numba.errors import TypingError
 
-from .core import gemm, syrk, mksymm, TypingContext
+from . import lib
+from ._core import TypingContext
 
 
 class NumbaTyping(TypingContext):
@@ -44,7 +45,7 @@ class NumbaTyping(TypingContext):
 _CTX = NumbaTyping()
 
 
-@overload(gemm)
+@overload(lib.gemm)
 def overload_gemm(a, b, out=None, a_trans=False, a_conj=False,
                   b_trans=False, b_conj=False, alpha=1.0,
                   beta=0.0, nthreads=-1):
@@ -53,7 +54,7 @@ def overload_gemm(a, b, out=None, a_trans=False, a_conj=False,
     )[0]
 
 
-@overload(syrk)
+@overload(lib.syrk)
 def overload_syrk(a, out=None, a_trans=False, a_conj=False, out_upper=False,
                   alpha=1.0, beta=0.0, nthreads=-1):
     return _CTX.check_syrk(
@@ -61,6 +62,6 @@ def overload_syrk(a, out=None, a_trans=False, a_conj=False, out_upper=False,
     )[0]
 
 
-@overload(mksymm)
+@overload(lib.mksymm)
 def overload_mksymm(a, upper=False, nthreads=-1):
     return _CTX.check_mksymm(a, upper, nthreads)

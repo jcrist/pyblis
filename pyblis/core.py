@@ -151,7 +151,7 @@ def gemm(a, b, out=None, a_trans=False, a_conj=False,
          b_trans=False, b_conj=False, alpha=1.0, beta=0.0, nthreads=-1):
     """Multiply two matrices.
 
-    Solves ``out = alpha * op_a(a).dot(beta * op_b(b))``.
+    Solves ``out = alpha * op_a(a).dot(op_b(b)) + beta * out``.
 
     Where ``op_a`` and ``op_b`` indicate any transpose/conjugate operation
     specified on ``a`` or ``b`` respectively.
